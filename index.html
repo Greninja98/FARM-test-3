@@ -1,136 +1,919 @@
-// ==========================================
-        // 导入 / 导出 功能逻辑 (CSV & JSON)
+<!DOCTYPE html>
+<html lang="zh">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <meta name="theme-color" content="#111827">
+    <link rel="icon" href="data:,">
+    <title>K | TAG CRM (Cloud Sync + Excel Backup)</title>
+    <style>
+        :root {
+            --primary-bg: #f4f5f7;
+            --sidebar-bg: #111827;
+            --sidebar-text: #e5e7eb;
+            --card-bg: #ffffff;
+            --border-color: #e5e7eb;
+            --accent-color: #d4af37; 
+            --text-main: #1f2937;
+            --text-muted: #6b7280;
+        }
+        * { box-sizing: border-box; margin: 0; padding: 0; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; }
+        
+        body { display: flex; min-height: 100vh; background-color: var(--primary-bg); color: var(--text-main); transition: 0.3s;}
+        
+        body.mobile-mode { flex-direction: column; padding-bottom: 20px; }
+        body.mobile-mode .sidebar { width: 100%; background-color: var(--sidebar-bg); color: var(--sidebar-text); padding: 10px; display: flex; flex-direction: row; overflow-x: auto; white-space: nowrap; position: sticky; top: 0; z-index: 100; gap: 8px; box-shadow: 0 2px 5px rgba(0,0,0,0.2); }
+        body.mobile-mode .brand { display: none; }
+        body.mobile-mode .nav-divider { display: none; }
+        body.mobile-mode .nav-item { padding: 10px 15px; cursor: pointer; border-radius: 6px; font-size: 14px; margin-bottom: 0;}
+        body.mobile-mode .main-content { flex: 1; padding: 15px; width: 100%; }
+        body.mobile-mode .header { display: flex; flex-direction: column; gap: 12px; margin-bottom: 20px; padding-bottom: 15px; border-bottom: 2px solid var(--border-color); }
+        body.mobile-mode .header-controls { display: flex; flex-direction: column; gap: 10px; width: 100%; }
+        body.mobile-mode #view-container { display: flex; flex-direction: column; gap: 15px; width: 100%; }
+        body.mobile-mode .client-card { width: 100%; }
+        body.mobile-mode .board-col { width: 100%; margin-bottom: 15px; }
+        body.mobile-mode .form-grid { display: flex; flex-direction: column; gap: 15px; }
+        body.mobile-mode .custom-date-row { display: flex; flex-direction: column; gap: 15px; width: 100%; }
+        body.mobile-mode .data-btn-group { display: flex; flex-direction: column; gap: 10px; }
+        body.mobile-mode .data-panel-btn { width: 100%; }
+
+        body.desktop-mode { flex-direction: row; height: 100vh; overflow: hidden; }
+        body.desktop-mode .sidebar { width: 250px; background-color: var(--sidebar-bg); color: var(--sidebar-text); padding: 20px; display: flex; flex-direction: column; height: 100vh; overflow-y: auto; flex-shrink: 0; }
+        body.desktop-mode .brand { display: block; font-size: 24px; font-weight: bold; margin-bottom: 40px; color: var(--accent-color); letter-spacing: 2px; }
+        body.desktop-mode .nav-divider { display: block; height: 1px; background: rgba(255,255,255,0.1); margin: 10px 0; }
+        body.desktop-mode .nav-item { padding: 12px 15px; cursor: pointer; border-radius: 6px; font-size: 14px; margin-bottom: 8px;}
+        body.desktop-mode .main-content { flex: 1; padding: 30px; height: 100vh; overflow-y: auto; }
+        body.desktop-mode .header { display: flex; flex-direction: row; justify-content: space-between; align-items: center; margin-bottom: 30px; padding-bottom: 15px; border-bottom: 2px solid var(--border-color); }
+        body.desktop-mode .header-controls { display: flex; flex-direction: row; gap: 15px; align-items: center; }
+        body.desktop-mode #view-container { display: flex; flex-direction: row; flex-wrap: wrap; gap: 20px; align-items: flex-start; }
+        body.desktop-mode .client-card { width: calc(33.333% - 14px); min-width: 320px; }
+        body.desktop-mode .board-col { flex: 1; min-width: 250px; }
+        body.desktop-mode .form-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; }
+        body.desktop-mode .form-group.full-width { grid-column: span 2; }
+        body.desktop-mode .custom-date-row { display: flex; flex-direction: row; gap: 20px; width: 100%; grid-column: span 2; }
+        body.desktop-mode .custom-date-row > div { flex: 1; }
+        body.desktop-mode .data-btn-group { display: flex; flex-direction: row; gap: 15px; }
+        body.desktop-mode .data-panel-btn { width: auto; min-width: 180px; }
+
+        .nav-item:hover, .nav-item.active { background-color: rgba(255,255,255,0.1); color: var(--accent-color); font-weight: bold;}
+        .header h1 { font-size: 20px; }
+        .search-container { display: flex; width: 100%; max-width: 300px;}
+        .search-container input { padding: 10px 12px; border: 1px solid var(--border-color); border-radius: 6px 0 0 6px; outline: none; flex: 1; font-size: 13px; }
+        .search-container input:focus { border-color: var(--accent-color); }
+        .search-container button { padding: 10px 15px; border: none; background: var(--sidebar-bg); color: #fff; border-radius: 0 6px 6px 0; cursor: pointer; font-weight: bold; }
+        .system-date { font-size: 12px; color: var(--text-muted); background: #e5e7eb; padding: 8px 12px; border-radius: 20px; align-self: center; white-space: nowrap;}
+        
+        .btn-toggle-view { background: #e0e7ff; color: #3730a3; border: 1px solid #c7d2fe; padding: 8px 15px; border-radius: 6px; cursor: pointer; font-size: 13px; font-weight: bold; transition: 0.2s; white-space: nowrap; align-self: center; }
+        .btn-toggle-view:hover { background: #c7d2fe; }
+
+        .client-card { background: var(--card-bg); border: 1px solid var(--border-color); border-radius: 12px; padding: 16px; box-shadow: 0 2px 8px rgba(0,0,0,0.06); display: flex; flex-direction: column;}
+        .client-card.highlight-card { border: 2px solid var(--accent-color); transform: scale(1.02); box-shadow: 0 4px 12px rgba(212,175,55,0.2); }
+        .client-card.dried-card { opacity: 0.75; filter: grayscale(50%); border-style: dashed; }
+        .client-card h3 { margin-bottom: 12px; display: flex; justify-content: space-between; align-items: flex-start; font-size: 18px;}
+        .tag-container { display: flex; flex-direction: column; gap: 4px; align-items: flex-end; }
+        .tag { font-size: 11px; padding: 4px 8px; border-radius: 4px; background: #eee; white-space: nowrap; font-weight: normal;}
+        .tag.tree-seed { background: #d1fae5; color: #065f46; }
+        .tag.tree-small { background: #a7f3d0; color: #065f46; }
+        .tag.tree-growing { background: #34d399; color: #064e3b; }
+        .tag.tree-fruit { background: #10b981; color: #fff; }
+        .tag.class-a { background: #fee2e2; color: #991b1b; }
+        
+        .info-group { margin-bottom: 8px; font-size: 14px; display: flex; }
+        .info-label { color: var(--text-muted); width: 90px; flex-shrink: 0;}
+        .info-content { flex: 1; word-break: break-word; }
+        
+        .alerts-container { margin-top: 10px; display: flex; flex-direction: column; gap: 8px; border-top: 1px dashed var(--border-color); padding-top: 12px;}
+        .alert-row { display: flex; align-items: center; font-size: 13px; font-weight: 500; }
+        .status-badge { padding: 3px 6px; border-radius: 4px; font-size: 11px; font-weight: bold; margin-right: 8px; color: #fff; width: 36px; text-align: center; flex-shrink: 0;}
+        .badge-d0 { background: #dc2626; } 
+        .badge-d1 { background: #f59e0b; } 
+        .badge-d2 { background: #3b82f6; } 
+
+        .note-box { margin-top: 15px; padding: 12px; background: #f8fafc; border-radius: 8px; font-size: 13px; border-left: 3px solid var(--accent-color); color: #334155; }
+        .note-header { font-weight: 600; margin-bottom: 4px; color: #0f172a; font-size: 12px;}
+
+        .card-actions { margin-top: 15px; display: flex; flex-wrap: wrap; gap: 8px; border-top: 1px solid var(--border-color); padding-top: 15px; }
+        .btn-detail, .btn-edit, .btn-delete, .btn-note, .btn-recover { padding: 10px 8px; border: none; border-radius: 6px; cursor: pointer; font-size: 13px; font-weight: 600; flex: 1; min-width: 45%; text-align: center;}
+        .btn-detail { background: #fdf4ff; color: #a21caf; }
+        .btn-edit { background: #f3f4f6; color: #374151; }
+        .btn-note { background: #e0e7ff; color: #3730a3; }
+        .btn-delete { background: #fef2f2; color: #dc2626; }
+        .btn-recover { background: #d1fae5; color: #065f46; border: 1px solid #34d399;}
+        
+        .btn-tick { width: 100%; margin-top: 12px; background: #10b981; color: white; border: none; padding: 12px; border-radius: 8px; cursor: pointer; font-weight: bold; font-size: 14px; }
+
+        .board-col { background: #e5e7eb; padding: 15px; border-radius: 12px; }
+        .board-col h3 { margin-bottom: 15px; font-size: 16px; text-align: center; }
+        .board-card { background: #fff; padding: 15px; margin-bottom: 10px; border-radius: 8px; box-shadow: 0 1px 3px rgba(0,0,0,0.1); cursor: pointer; }
+
+        .form-container { background: var(--card-bg); padding: 20px; border-radius: 12px; width: 100%; box-shadow: 0 2px 8px rgba(0,0,0,0.06); }
+        .form-group label { display: block; margin-bottom: 6px; font-size: 14px; font-weight: 600;}
+        .form-group input, .form-group select { width: 100%; padding: 12px; border: 1px solid var(--border-color); border-radius: 8px; outline: none; font-size: 14px; background: #fff;}
+        .checkbox-group { display: flex; flex-direction: column; gap: 12px; margin-top: 10px; background: #f8fafc; padding: 15px; border-radius: 8px; border: 1px solid #e2e8f0;}
+        .btn-submit { background: var(--sidebar-bg); color: #fff; border: none; padding: 15px; border-radius: 8px; cursor: pointer; font-size: 16px; font-weight: bold; margin-top: 25px; width: 100%;}
+        
+        .data-panel-btn { padding: 15px; font-size: 14px; font-weight: bold; border-radius: 8px; border: none; text-align: center; cursor: pointer;}
+        .btn-export { background: #f3f4f6; color: #111827; border: 1px solid #d1d5db; }
+        .btn-import { background: var(--sidebar-bg); color: #fff; }
+    </style>
+</head>
+<body class="mobile-mode"> 
+    <div class="sidebar">
+        <div class="brand">K | TAG</div>
+        <div class="nav-item active" id="nav-gallery" onclick="switchView('gallery', this)">📇 总览</div>
+        <div class="nav-item" id="nav-add" onclick="switchView('add', this)">➕ 新增</div>
+        <div class="nav-divider"></div>
+        <div class="nav-item" id="nav-d2" onclick="switchView('d2', this)">⏰ 提醒</div>
+        <div class="nav-item" id="nav-tree" onclick="switchView('tree', this)">🌳 一亩田</div>
+        <div class="nav-divider"></div>
+        <div class="nav-item" id="nav-classA" onclick="switchView('classA', this)">🔥 A</div>
+        <div class="nav-item" id="nav-classB" onclick="switchView('classB', this)">💎 B</div>
+        <div class="nav-item" id="nav-classC" onclick="switchView('classC', this)">🧱 C</div>
+        <div class="nav-divider"></div>
+        <div class="nav-item" id="nav-classE" onclick="switchView('classE', this)">🌐 E</div>
+        <div class="nav-item" id="nav-classF" onclick="switchView('classF', this)">🤝 F</div>
+        <div class="nav-divider"></div>
+        <div class="nav-item" id="nav-data" onclick="switchView('data', this)">💾 数据与云备份</div>
+        <div class="nav-item" id="nav-dried" onclick="switchView('dried', this)" style="color:#fbbf24;">🍂 干枯</div>
+    </div>
+
+    <div class="main-content">
+        <div class="header">
+            <h1 id="view-title">系统初始化中...</h1>
+            <div class="header-controls">
+                <button id="view-toggle-btn" class="btn-toggle-view" onclick="toggleLayoutMode()">切换视图</button>
+                <div class="search-container">
+                    <input type="text" id="global-search" placeholder="搜索姓名, 居住地, 记录..." onkeyup="executeSearch()">
+                    <button onclick="executeSearch()">🔍</button>
+                </div>
+                <div class="system-date" id="current-date-display"></div>
+            </div>
+        </div>
+        <div id="view-container"></div>
+    </div>
+
+    <script>
+        // ==========================================
+        // 核心 API Configuration (Google Drive / Sheets Backup Link)
+        // ==========================================
+        const API_URL = "https://script.google.com/macros/s/AKfycbwy3xagEiJ6EdDMfG01oCIFTrTgv7slXBFbVvTJdV9Hg_QH1L5n_TxLChZCD8wnSOGS/exec";
         // ==========================================
 
-        // 导出 CSV 模板（带现有数据以便更新）
-        function exportCSVTemplate() {
-            let headers = ["ID (勿改)", "姓名 (Name)", "职业 (Occupation)", "居住地 (Location)", "树种 (Seed/Small Tree/Growing Tree/Fruit Tree)", "评级结构", "出生日期 (YYYY-MM-DD)", "保单日 (YYYY-MM-DD)", "体检日 (YYYY-MM-DD)", "自定义日名称", "自定义日期 (YYYY-MM-DD)"];
-            
-            // 加上 BOM 头确保 Excel 打开 UTF-8 不会乱码
-            let csvContent = "\uFEFF" + headers.join(",") + "\n"; 
-            
-            clients.forEach(c => {
-                if(!c.isDeleted) {
-                    let row = [
-                        c.id, c.name, c.occupation, c.location, c.treeCategory, c.classRating,
-                        c.dob, c.policyAnniv, c.medical, c.customDateName, c.customDateValue
-                    ].map(v => {
-                        let str = (v === null || v === undefined) ? '' : String(v);
-                        // 替换双引号并用双引号包裹，防止逗号截断
-                        return `"${str.replace(/"/g, '""')}"`; 
-                    }).join(",");
-                    csvContent += row + "\n";
+        let isMobileMode = true;
+        if (localStorage.getItem('kTagLayoutMode') === 'desktop') { isMobileMode = false; }
+
+        function applyLayoutMode() {
+            const body = document.body;
+            const toggleBtn = document.getElementById('view-toggle-btn');
+            if (isMobileMode) {
+                body.classList.remove('desktop-mode');
+                body.classList.add('mobile-mode');
+                toggleBtn.innerHTML = "💻 电脑版";
+                localStorage.setItem('kTagLayoutMode', 'mobile');
+            } else {
+                body.classList.remove('mobile-mode');
+                body.classList.add('desktop-mode');
+                toggleBtn.innerHTML = "📱 手机版";
+                localStorage.setItem('kTagLayoutMode', 'desktop');
+            }
+        }
+
+        function toggleLayoutMode() {
+            isMobileMode = !isMobileMode;
+            applyLayoutMode();
+        }
+
+        applyLayoutMode();
+
+        const todayReal = new Date();
+        const systemDateStr = todayReal.toISOString().split('T')[0];
+        document.getElementById('current-date-display').innerText = "Date: " + systemDateStr;
+
+        let globalSearchText = "";
+        function executeSearch() {
+            globalSearchText = document.getElementById('global-search').value.trim();
+            refreshCurrentView();
+        }
+
+        function matchSearch(client, text) {
+            if(!text) return true;
+            text = text.toLowerCase();
+            if(client.name && client.name.toLowerCase().includes(text)) return true;
+            if(client.location && client.location.toLowerCase().includes(text)) return true;
+            if(client.occupation && client.occupation.toLowerCase().includes(text)) return true;
+            if(client.lastNote && client.lastNote.toLowerCase().includes(text)) return true;
+            if(client.notes && client.notes.some(n => n.content && n.content.toLowerCase().includes(text))) return true;
+            return false;
+        }
+
+        const defaultClients = [
+            { id: 1, name: "云端测试客户", occupation: "演示", location: "System", treeCategory: "Seed", dob: "1990-01-01", policyAnniv: "", medical: "", classRating: "C (normal case size)", classA: false, classE: false, classF: false, classD: false, isDeleted: false, customDateName: "", customDateValue: "", clearedAlerts: [], lastNote: "", lastNoteDate: "", notes: [] }
+        ];
+
+        let clients = [];
+        let highlightClientId = null;
+        let currentView = 'gallery';
+        let currentD2Month = null;
+
+        // --- 自动从 Google Drive (Sheets) 拉取最新数据的函数 ---
+        async function initData() {
+            document.getElementById('view-title').innerText = "⏳ 正在从云端拉取最新数据...";
+            try {
+                if(!API_URL.includes("script.google.com")) {
+                    throw new Error("请先配置 API_URL");
                 }
+                
+                let response = await fetch(API_URL);
+                let text = await response.text();
+                
+                if(text && text.length > 5) { 
+                    clients = JSON.parse(text);
+                    clients.forEach(c => {
+                        if (!c.notes) {
+                            c.notes = [];
+                            if (c.lastNote && c.lastNoteDate) c.notes.push({ date: c.lastNoteDate, content: c.lastNote });
+                        }
+                    });
+                } else {
+                    if (localStorage.getItem('kTagClients')) {
+                        clients = JSON.parse(localStorage.getItem('kTagClients'));
+                        saveData(); 
+                    } else {
+                        clients = defaultClients;
+                    }
+                }
+            } catch (error) {
+                console.warn("云端连接失败，使用本地缓存:", error);
+                if (localStorage.getItem('kTagClients')) {
+                    clients = JSON.parse(localStorage.getItem('kTagClients'));
+                } else {
+                    clients = defaultClients;
+                }
+            }
+            refreshCurrentView();
+        }
+
+        // --- 保存到本地并同时推送到 Google Drive (Sheets) 的函数 ---
+        async function saveData() {
+            // 1. 立即保存至本地缓存 (Local Storage) 以防数据丢失
+            localStorage.setItem('kTagClients', JSON.stringify(clients));
+
+            // 2. 将数据 POST 到 Google Apps Script 写入 Google Sheets 进行云端备份
+            if(API_URL.includes("script.google.com")) {
+                try {
+                    await fetch(API_URL, {
+                        method: 'POST',
+                        mode: 'no-cors', // 绕过跨域限制，确保数据顺利推送到 Drive
+                        headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+                        body: 'data=' + encodeURIComponent(JSON.stringify(clients))
+                    });
+                    console.log("云端同步请求已发送至 Google Drive");
+                } catch (error) {
+                    console.error("云端写入失败", error);
+                }
+            }
+        }
+
+        // --- Render and UI functions ---
+        function getAlertInfo(eventName, dateString, isRecurring) {
+            if (!dateString) return null;
+            let today = new Date();
+            today.setHours(0, 0, 0, 0);
+            let targetDate = new Date(dateString);
+            if (isNaN(targetDate)) return null;
+            targetDate.setHours(0, 0, 0, 0);
+            let alertYear = targetDate.getFullYear();
+            if (isRecurring) {
+                targetDate.setFullYear(today.getFullYear());
+                let diffThisYear = Math.ceil((targetDate.getTime() - today.getTime()) / (1000 * 60 * 60 * 24));
+                if (diffThisYear < -65) targetDate.setFullYear(today.getFullYear() + 1);
+                alertYear = targetDate.getFullYear();
+            }
+            let diffDays = Math.ceil((targetDate.getTime() - today.getTime()) / (1000 * 60 * 60 * 24));
+            return { days: diffDays, id: `${eventName}_${alertYear}`, date: targetDate };
+        }
+
+        function generateAlertHtml(client, eventName, dateString, isRecurring, forceShowMonth = null) {
+            let info = getAlertInfo(eventName, dateString, isRecurring);
+            if (!info) return '';
+            if (client.clearedAlerts && client.clearedAlerts.includes(info.id)) return '';
+            let eventMonth = dateString ? parseInt(dateString.split('-')[1], 10) : null;
+            if (forceShowMonth !== null && eventMonth !== forceShowMonth) return '';
+            if (forceShowMonth === null && (info.days > 65 || info.days < -65)) return '';
+            if (!client._activeAlerts) client._activeAlerts = [];
+            client._activeAlerts.push(info.id);
+            let badge = info.days <= 7 ? 'D-0' : (info.days <= 30 ? 'D-1' : 'D-2');
+            let badgeClass = info.days <= 7 ? 'badge-d0' : (info.days <= 30 ? 'badge-d1' : 'badge-d2');
+            let displayDate = info.date;
+            let dateFormatted = isRecurring ? `${String(displayDate.getMonth() + 1).padStart(2, '0')}/${String(displayDate.getDate()).padStart(2, '0')}` : dateString;
+            let timeStr = info.days >= 0 ? `倒数 ${info.days} 天` : `已过 ${Math.abs(info.days)} 天`;
+            return `<div class="alert-row"><span class="status-badge ${badgeClass}">${badge}</span><span style="color:#374151;">${eventName} (${dateFormatted}) - <b>${timeStr}</b></span></div>`;
+        }
+
+        const container = document.getElementById('view-container');
+        const title = document.getElementById('view-title');
+
+        function getTreeClass(tree) {
+            if(tree === 'Seed') return 'tree-seed';
+            if(tree === 'Small Tree') return 'tree-small';
+            if(tree === 'Growing Tree') return 'tree-growing';
+            return 'tree-fruit';
+        }
+
+        function createCard(client, showActions = false, isD2View = false, forceShowMonth = null) {
+            client._activeAlerts = []; 
+            let alertsHtml = generateAlertHtml(client, '生日', client.dob, true, forceShowMonth) +
+                             generateAlertHtml(client, '保单日', client.policyAnniv, true, forceShowMonth) +
+                             generateAlertHtml(client, '体检安排', client.medical, false, forceShowMonth) +
+                             (client.customDateName ? generateAlertHtml(client, client.customDateName, client.customDateValue, true, forceShowMonth) : '');
+            let tickBtnHtml = (isD2View && client._activeAlerts.length > 0 && !client.isDeleted) ? `<button class="btn-tick" onclick="markAsMet(${client.id})">✅ 见面打卡并核销提醒</button>` : '';
+            let alertContainer = alertsHtml ? `<div class="alerts-container">${alertsHtml}</div>${tickBtnHtml}` : '';
+            let actionsHtml = '';
+            if (showActions) {
+                if (client.isDeleted) {
+                    actionsHtml = `<div class="card-actions"><button class="btn-recover" onclick="recoverClient(${client.id})">♻️ 重新激活</button><button class="btn-delete" onclick="deleteClient(${client.id})">❌ 彻底删除</button></div>`;
+                } else {
+                    actionsHtml = `<div class="card-actions"><button class="btn-detail" onclick="viewClientHistory(${client.id})">📖 历史</button><button class="btn-edit" onclick="editClient(${client.id})">✏️ 编辑</button><button class="btn-note" onclick="addNote(${client.id})">📝 记录</button><button class="btn-delete" onclick="deleteClient(${client.id})">🗑️ 移至干枯</button></div>`;
+                }
+            }
+            let customDateHtml = (client.customDateName && client.customDateValue) ? `<div class="info-group" style="margin-top:10px;"><span class="info-label" style="color:var(--accent-color);">${client.customDateName}:</span> <span class="info-content">${client.customDateValue}</span></div>` : '';
+            let noteHtml = client.lastNote ? `<div class="note-box"><div class="note-header">🗣️ 上次互动 (${client.lastNoteDate}):</div><div>${client.lastNote}</div></div>` : '';
+            return `<div class="client-card ${(client.id === highlightClientId) ? 'highlight-card' : ''} ${client.isDeleted ? 'dried-card' : ''}" id="card-${client.id}"><h3>${client.name} <div class="tag-container"><span class="tag ${getTreeClass(client.treeCategory)}">${client.treeCategory}</span>${client.classA ? '<span class="tag class-a">Class A</span>' : ''}</div></h3><div class="info-group"><span class="info-label">职业:</span> <span class="info-content">${client.occupation || '-'}</span></div><div class="info-group"><span class="info-label">居住地:</span> <span class="info-content">${client.location || '-'}</span></div><hr style="margin: 10px 0; border: 0; border-top: 1px solid #eee;"><div class="info-group"><span class="info-label">出生日期:</span> <span class="info-content">${client.dob || '-'}</span></div><div class="info-group"><span class="info-label">保单周年日:</span> <span class="info-content">${client.policyAnniv || '-'}</span></div><div class="info-group"><span class="info-label">体检日:</span> <span class="info-content">${client.medical || '-'}</span></div>${customDateHtml}${alertContainer}${noteHtml}${actionsHtml}</div>`;
+        }
+
+        function renderGallery() {
+            title.innerText = "总卡片视图 (Gallery View)";
+            let data = clients.filter(c => !c.isDeleted && matchSearch(c, globalSearchText));
+            container.innerHTML = data.length > 0 ? data.map(c => createCard(c, true, false)).join('') : `<div class="form-container" style="width: 100%;"><p style="text-align:center; color:#666;">找不到匹配 "${globalSearchText}" 的结果。</p></div>`;
+            if (highlightClientId) {
+                const element = document.getElementById(`card-${highlightClientId}`);
+                if (element) element.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                setTimeout(() => { highlightClientId = null; }, 3000);
+            }
+        }
+
+        function navigateToClientDetails(id) {
+            highlightClientId = id;
+            switchView('gallery', document.getElementById('nav-gallery'));
+        }
+
+        function renderD2(selectedMonth = null) {
+            if (selectedMonth === undefined) selectedMonth = currentD2Month;
+            currentD2Month = selectedMonth;
+            title.innerText = selectedMonth ? `⏰ D-2 提醒 (${selectedMonth}月份)` : "⏰ D-2 提醒 (60天内)";
+            let memoHtml = `<div style="width: 100%; margin-bottom: 20px; padding: 12px 15px; background: #e0f2fe; border-left: 4px solid #3b82f6; border-radius: 6px; font-size: 13px; color: #1e3a8a;"><b>📌 提醒说明:</b> <span class="status-badge badge-d0">D-0</span> (0-7 days), <span class="status-badge badge-d1">D-1</span> (8-30 days), <span class="status-badge badge-d2">D-2</span> (31-65 days).</div>`;
+            let months = ["All", "Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
+            let btnHtml = '<div style="width: 100%; margin-bottom: 15px; display: flex; gap: 8px; flex-wrap: wrap;">';
+            months.forEach((m, idx) => {
+                let mVal = idx === 0 ? null : idx;
+                btnHtml += `<button onclick="renderD2(${mVal === null ? 'null' : mVal})" style="padding: 8px 12px; border: none; border-radius: 6px; cursor: pointer; background: ${selectedMonth === mVal ? "var(--accent-color)" : "#e5e7eb"}; color: ${selectedMonth === mVal ? "#000" : "#374151"}; font-weight: bold; font-size: 13px;">${m}</button>`;
+            });
+            btnHtml += '</div>';
+            let upcomingClients = clients.filter(c => {
+                if (c.isDeleted) return false;
+                let tempAlerts = [];
+                let check = (eventName, dateString, isRecurring) => {
+                    if (!dateString) return;
+                    let info = getAlertInfo(eventName, dateString, isRecurring);
+                    if (info && !(c.clearedAlerts||[]).includes(info.id)) {
+                        let eventMonth = parseInt(dateString.split('-')[1], 10);
+                        if (selectedMonth !== null ? eventMonth === selectedMonth : (info.days >= -65 && info.days <= 65)) tempAlerts.push(info.id);
+                    }
+                };
+                check('生日', c.dob, true); check('保单日', c.policyAnniv, true); check('体检安排', c.medical, false);
+                if(c.customDateName) check(c.customDateName, c.customDateValue, true);
+                return tempAlerts.length > 0 && matchSearch(c, globalSearchText);
+            });
+            container.innerHTML = memoHtml + btnHtml + (upcomingClients.length > 0 ? upcomingClients.map(c => createCard(c, false, true, selectedMonth)).join('') : `<div class="form-container" style="width: 100%;"><p style="text-align:center; color:#666;">暂无提醒事项。</p></div>`);
+        }
+
+        function renderClassA() { title.innerText = "🔥 Class A 冲刺 (90天内见)"; let data = clients.filter(c => !c.isDeleted && c.classA && !c.classD && matchSearch(c, globalSearchText)); container.innerHTML = data.length > 0 ? data.map(c => createCard(c, true, false)).join('') : `<div class="form-container" style="width: 100%;"><p style="text-align:center; color:#666;">暂无相关客户。</p></div>`; }
+        function renderClassPanel(classChar, labelText) { title.innerText = labelText; let data = clients.filter(c => !c.isDeleted && c.classRating && c.classRating.startsWith(classChar) && !c.classD && matchSearch(c, globalSearchText)); container.innerHTML = data.length > 0 ? data.map(c => createCard(c, true, false)).join('') : `<div class="form-container" style="width: 100%;"><p style="text-align:center; color:#666;">暂无相关客户。</p></div>`; }
+        function renderClassB() { renderClassPanel('B', '💎 Class B 贵宾'); }
+        function renderClassC() { renderClassPanel('C', '🧱 Class C 基石'); }
+        function renderClassSpecial(field, labelText) { title.innerText = labelText; let data = clients.filter(c => !c.isDeleted && c[field] && !c.classD && matchSearch(c, globalSearchText)); container.innerHTML = data.length > 0 ? data.map(c => createCard(c, true, false)).join('') : `<div class="form-container" style="width: 100%;"><p style="text-align:center; color:#666;">暂无相关客户。</p></div>`; }
+        function renderClassE() { renderClassSpecial('classE', '🌐 Class E 人脉辐射'); }
+        function renderClassF() { renderClassSpecial('classF', '🤝 Class F 事业伙伴'); }
+
+        function renderTree() {
+            title.innerText = "🌳 一亩田概况";
+            let html = '';
+            ['Seed', 'Small Tree', 'Growing Tree', 'Fruit Tree'].forEach(cat => {
+                let catClients = clients.filter(c => !c.isDeleted && c.treeCategory === cat && matchSearch(c, globalSearchText));
+                html += `<div class="board-col"><h3>${cat} (${catClients.length})</h3>${catClients.map(c => `<div class="board-card" onclick="navigateToClientDetails(${c.id})"><strong>${c.name}</strong><br><span style="font-size: 12px; color: #666;">评级: ${c.classRating.split(' ')[0]}</span></div>`).join('')}</div>`;
+            });
+            container.innerHTML = html;
+        }
+
+        function renderDried() {
+            title.innerText = "🍂 Dried 干枯";
+            let data = clients.filter(c => c.isDeleted && matchSearch(c, globalSearchText));
+            container.innerHTML = data.length > 0 ? data.map(c => createCard(c, true, false)).join('') : `<div class="form-container" style="width: 100%;"><p style="text-align:center; color:#666;">无相关结果。</p></div>`;
+        }
+
+        function viewClientHistory(id) {
+            currentView = 'history'; document.querySelectorAll('.nav-item').forEach(el => el.classList.remove('active'));
+            let client = clients.find(c => c.id === id); title.innerText = `📖 ${client.name} 详情`;
+            let historyHtml = client.notes && client.notes.length > 0 ? client.notes.map(n => `<div style="background:#fff; padding:15px; border-left:4px solid var(--accent-color); border-radius:8px; margin-bottom:15px; box-shadow:0 1px 3px rgba(0,0,0,0.1);"><div style="font-size:12px; color:#6b7280; margin-bottom:5px;">📅 记录时间: ${n.date}</div><div style="font-size:14px; color:#1f2937; white-space:pre-wrap;">${n.content}</div></div>`).reverse().join('') : `<div class="form-container" style="width: 100%;"><p style="text-align:center; color:#666;">该客户暂无历史互动记录。</p></div>`;
+            container.innerHTML = `<div style="width:100%;"><button onclick="switchView('gallery', document.getElementById('nav-gallery'))" style="margin-bottom:20px; padding:10px 16px; border:none; border-radius:6px; cursor:pointer; background:#e5e7eb; color:#374151; font-weight:bold; width: 100%;">⬅️ 返回总览视图</button><div class="client-card" style="width: 100%; margin-bottom: 30px;"><h3 style="margin-bottom:15px; padding-bottom:10px; border-bottom:1px solid #eee;">客户基础档案</h3><div class="form-grid" style="gap: 10px;"><div class="info-group"><span class="info-label">姓名:</span> <span class="info-content"><b>${client.name}</b></span></div><div class="info-group"><span class="info-label">职业:</span> <span class="info-content">${client.occupation || '-'}</span></div><div class="info-group"><span class="info-label">居住地:</span> <span class="info-content">${client.location || '-'}</span></div><div class="info-group"><span class="info-label">评级结构:</span> <span class="info-content">${client.classRating}</span></div><div class="info-group"><span class="info-label">树种类别:</span> <span class="info-content">${client.treeCategory}</span></div></div></div><div style="display:flex; flex-direction:column; gap: 15px; margin-bottom: 20px;"><h3 style="color:#1f2937;">历史记录列表 (${client.notes ? client.notes.length : 0})</h3><button class="btn-note" onclick="addNoteFromHistory(${client.id})" style="padding: 12px; border:none; border-radius:8px; font-weight:bold; width: 100%;">➕ 新增互动记录</button></div>${historyHtml}</div>`;
+        }
+
+        function addNoteFromHistory(id) { addNote(id); if (currentView === 'history') viewClientHistory(id); }
+
+        // ==========================================
+        // 数据管理与外部 Excel/JSON 备份逻辑
+        // ==========================================
+        function parseCSVRow(str, delimiter = ',') {
+            let result = [];
+            let cur = '';
+            let inQuotes = false;
+            for (let i = 0; i < str.length; i++) {
+                if (inQuotes) {
+                    if (str[i] === '"') {
+                        if (i + 1 < str.length && str[i + 1] === '"') { cur += '"'; i++; } 
+                        else { inQuotes = false; }
+                    } else { cur += str[i]; }
+                } else {
+                    if (str[i] === '"') { inQuotes = true; }
+                    else if (str[i] === delimiter) { result.push(cur); cur = ''; }
+                    else { cur += str[i]; }
+                }
+            }
+            result.push(cur);
+            return result;
+        }
+
+        function exportToCSV() {
+            if (!clients || clients.length === 0) {
+                alert("系统中没有数据可导出！");
+                return;
+            }
+            const activeClients = clients.filter(c => !c.isDeleted);
+            const totalRows = activeClients.length + 1; 
+
+            let xmlContent = `<?xml version="1.0" encoding="utf-8"?>
+<?mso-application progid="Excel.Sheet"?>
+<Workbook xmlns="urn:schemas-microsoft-com:office:spreadsheet"
+ xmlns:o="urn:schemas-microsoft-com:office:office"
+ xmlns:x="urn:schemas-microsoft-com:office:excel"
+ xmlns:ss="urn:schemas-microsoft-com:office:spreadsheet"
+ xmlns:html="http://www.w3.org/TR/REC-html40">
+ <DocumentProperties xmlns="urn:schemas-microsoft-com:office:office">
+  <Author>K TAG Agency CRM</Author>
+  <Created>${new Date().toISOString()}</Created>
+ </DocumentProperties>
+ <Styles>
+  <Style ss:ID="Default" ss:Name="Normal">
+   <Alignment ss:Vertical="Center"/>
+   <Borders/>
+   <Font ss:FontName="Calibri" x:CharSet="134" ss:Size="11" ss:Color="#000000"/>
+   <Interior/>
+   <NumberFormat/>
+   <Protection/>
+  </Style>
+  <Style ss:ID="HeaderStyle">
+   <Font ss:FontName="Calibri" ss:Size="11" ss:Color="#FFFFFF" ss:Bold="1"/>
+   <Interior ss:Color="#111827" ss:Pattern="Solid"/>
+  </Style>
+ </Styles>
+ <Worksheet ss:Name="Clients">
+  <Table ss:ExpandedColumnCount="14" ss:ExpandedRowCount="${totalRows}" x:FullColumns="1" x:FullRows="1" ss:DefaultRowHeight="20">
+   <Column ss:Width="50"/> <Column ss:Width="100"/> <Column ss:Width="120"/> <Column ss:Width="100"/> <Column ss:Width="120"/> <Column ss:Width="90"/> <Column ss:Width="90"/> <Column ss:Width="90"/> <Column ss:Width="180"/> <Column ss:Width="120"/> <Column ss:Width="100"/> <Column ss:Width="60"/> <Column ss:Width="60"/> <Column ss:Width="60"/> <Row ss:StyleID="HeaderStyle">
+    <Cell><Data ss:Type="String">ID</Data></Cell>
+    <Cell><Data ss:Type="String">Name</Data></Cell>
+    <Cell><Data ss:Type="String">Occupation</Data></Cell>
+    <Cell><Data ss:Type="String">Location</Data></Cell>
+    <Cell><Data ss:Type="String">TreeCategory</Data></Cell>
+    <Cell><Data ss:Type="String">DOB</Data></Cell>
+    <Cell><Data ss:Type="String">PolicyAnniv</Data></Cell>
+    <Cell><Data ss:Type="String">MedicalCheck</Data></Cell>
+    <Cell><Data ss:Type="String">ClassRating</Data></Cell>
+    <Cell><Data ss:Type="String">CustomDateName</Data></Cell>
+    <Cell><Data ss:Type="String">CustomDateValue</Data></Cell>
+    <Cell><Data ss:Type="String">ClassA</Data></Cell>
+    <Cell><Data ss:Type="String">ClassE</Data></Cell>
+    <Cell><Data ss:Type="String">ClassF</Data></Cell>
+   </Row>`;
+
+            const escapeXml = (str) => {
+                if (!str) return "";
+                return str.toString()
+                    .replace(/&/g, "&amp;")
+                    .replace(/</g, "&lt;")
+                    .replace(/>/g, "&gt;")
+                    .replace(/"/g, "&quot;")
+                    .replace(/'/g, "&apos;");
+            };
+
+            let displayId = 1;
+            activeClients.forEach(c => {
+                xmlContent += `
+   <Row>
+    <Cell><Data ss:Type="Number">${displayId}</Data></Cell>
+    <Cell><Data ss:Type="String">${escapeXml(c.name)}</Data></Cell>
+    <Cell><Data ss:Type="String">${escapeXml(c.occupation)}</Data></Cell>
+    <Cell><Data ss:Type="String">${escapeXml(c.location)}</Data></Cell>
+    <Cell><Data ss:Type="String">${escapeXml(c.treeCategory)}</Data></Cell>
+    <Cell><Data ss:Type="String">${c.dob || ""}</Data></Cell>
+    <Cell><Data ss:Type="String">${c.policyAnniv || ""}</Data></Cell>
+    <Cell><Data ss:Type="String">${c.medical || ""}</Data></Cell>
+    <Cell><Data ss:Type="String">${escapeXml(c.classRating)}</Data></Cell>
+    <Cell><Data ss:Type="String">${escapeXml(c.customDateName)}</Data></Cell>
+    <Cell><Data ss:Type="String">${escapeXml(c.customDateValue)}</Data></Cell>
+    <Cell><Data ss:Type="String">${c.classA ? "Y" : "N"}</Data></Cell>
+    <Cell><Data ss:Type="String">${c.classE ? "Y" : "N"}</Data></Cell>
+    <Cell><Data ss:Type="String">${c.classF ? "Y" : "N"}</Data></Cell>
+   </Row>`;
+                displayId++; 
             });
 
-            let blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
-            let link = document.createElement("a");
+            xmlContent += `
+  </Table>
+  <WorksheetOptions xmlns="urn:schemas-microsoft-com:office:excel">
+   <ProtectObjects>False</ProtectObjects>
+   <ProtectScenarios>False</ProtectScenarios>
+  </WorksheetOptions>
+  <DataValidation xmlns="urn:schemas-microsoft-com:office:excel">
+   <Range>R2C5:R5000C5</Range>
+   <Type>List</Type>
+   <CellRangeList/>
+   <Value>&quot;Fruit Tree,Growing Tree,Small Tree,Seed&quot;</Value>
+  </DataValidation>
+  <DataValidation xmlns="urn:schemas-microsoft-com:office:excel">
+   <Range>R2C9:R5000C9</Range>
+   <Type>List</Type>
+   <CellRangeList/>
+   <Value>&quot;B+ (9X of normal case size),B (6X of normal case size),B- (3X of normal case size),C+ (&gt;normal case size),C (normal case size),C- (&lt;normal case size)&quot;</Value>
+  </DataValidation>
+  <DataValidation xmlns="urn:schemas-microsoft-com:office:excel">
+   <Range>R2C12:R5000C14</Range>
+   <Type>List</Type>
+   <CellRangeList/>
+   <Value>&quot;Y,N&quot;</Value>
+  </DataValidation>
+ </Worksheet>
+</Workbook>`;
+
+            const blob = new Blob([xmlContent], { type: 'application/vnd.ms-excel;charset=utf-8' });
+            const link = document.createElement("a");
             link.href = URL.createObjectURL(blob);
-            link.download = `KTAG_Clients_${systemDateStr}.csv`;
+            link.download = `K_TAG_Clients_${systemDateStr}.xls`;
+            document.body.appendChild(link);
             link.click();
+            document.body.removeChild(link);
         }
 
-        // 解析 CSV 行（处理逗号和引号的特殊情况）
-        function parseCSVRow(str) {
-            let arr = [], quote = false, val = '';
-            for (let i = 0; i < str.length; i++) {
-                let cc = str[i], nc = str[i+1];
-                if (cc === '"' && quote && nc === '"') { val += '"'; i++; continue; }
-                if (cc === '"') { quote = !quote; continue; }
-                if (cc === ',' && !quote) { arr.push(val); val = ''; continue; }
-                val += cc;
-            }
-            arr.push(val);
-            return arr.map(s => s.trim());
-        }
-
-        // 导入 CSV 并更新/新增客户
-        function importCSV(event) {
-            let file = event.target.files[0];
+        function importCsv(event) {
+            const file = event.target.files[0];
             if (!file) return;
-            let reader = new FileReader();
+
+            const reader = new FileReader();
+            reader.readAsArrayBuffer(file);
             reader.onload = function(e) {
-                let text = e.target.result;
-                let rows = text.split(/\r?\n/);
-                let newCount = 0, updateCount = 0;
+                const buffer = e.target.result;
+                const uint8Array = new Uint8Array(buffer);
                 
-                for(let i = 1; i < rows.length; i++) { // 跳过表头
-                    if(!rows[i].trim()) continue;
-                    let cols = parseCSVRow(rows[i]);
-                    if(cols.length < 2 || !cols[1]) continue; // 如果没有名字，跳过
+                let isUTF8 = false;
+                if (uint8Array.length >= 3 && uint8Array[0] === 0xEF && uint8Array[1] === 0xBB && uint8Array[2] === 0xBF) {
+                    isUTF8 = true;
+                }
+
+                let text = "";
+                if (isUTF8) {
+                    text = new TextDecoder('utf-8').decode(uint8Array);
+                } else {
+                    let decoder = new TextDecoder('gb18030');
+                    text = decoder.decode(uint8Array);
                     
-                    let id = cols[0] ? parseInt(cols[0]) : Date.now() + i;
-                    let existing = clients.find(c => c.id === id);
+                    if (text.includes('锟斤拷') || text.includes('閿熸') || text.includes('鐠')) {
+                        text = new TextDecoder('utf-8').decode(uint8Array);
+                    }
+                }
+
+                let rows = text.split(/\r?\n/);
+                
+                if (rows.length > 0 && rows[0].replace(/^\uFEFF/, '').trim().startsWith('sep=')) {
+                    rows.shift();
+                }
+                if (rows.length < 2) return;
+
+                let updatedCount = 0;
+                let addedCount = 0;
+
+                let headerLine = rows[0].replace(/^\uFEFF/, '').replace(/^\xEF\xBB\xBF/, '').trim();
+                
+                if (headerLine.startsWith('"') && headerLine.endsWith('"') && !headerLine.includes('\t') && headerLine.split(',').length === 1) {
+                    headerLine = headerLine.substring(1, headerLine.length - 1).replace(/""/g, '"');
+                }
+
+                let delimiter = headerLine.indexOf('\t') !== -1 ? '\t' : ',';
+                const headers = parseCSVRow(headerLine, delimiter);
+                const hasIdColumn = headers[0].trim().toUpperCase() === "ID";
+
+                for (let i = 1; i < rows.length; i++) {
+                    let rowStr = rows[i].trim();
+                    if (!rowStr) continue;
                     
-                    let clientData = {
-                        id: id,
-                        name: cols[1] || '',
-                        occupation: cols[2] || '',
-                        location: cols[3] || '',
-                        treeCategory: cols[4] || 'Seed',
-                        classRating: cols[5] || 'C (normal case size)',
-                        dob: cols[6] || '',
-                        policyAnniv: cols[7] || '',
-                        medical: cols[8] || '',
-                        customDateName: cols[9] || '',
-                        customDateValue: cols[10] || ''
+                    let testCols = parseCSVRow(rowStr, delimiter);
+                    if (testCols.length === 1 && rowStr.startsWith('"') && rowStr.endsWith('"')) {
+                        rowStr = rowStr.substring(1, rowStr.length - 1).replace(/""/g, '"');
+                        testCols = parseCSVRow(rowStr, delimiter);
+                    }
+
+                    const cols = testCols;
+                    let offset = hasIdColumn ? 1 : 0;
+                    
+                    let rowIdRaw = hasIdColumn && cols[0] ? cols[0].trim() : null;
+                    let rowId = (rowIdRaw && !isNaN(parseInt(rowIdRaw))) ? parseInt(rowIdRaw) : null;
+                    let rowName = cols[0 + offset] ? cols[0 + offset].trim() : "";
+                    
+                    if (rowName === "" || rowName.toUpperCase() === "NAME" || rowName.includes("ID Name Occupation")) {
+                        continue; 
+                    }
+
+                    const incomingData = {
+                        name: rowName,
+                        occupation: cols[1 + offset] || "",
+                        location: cols[2 + offset] || "",
+                        treeCategory: cols[3 + offset] || "Seed",
+                        dob: cols[4 + offset] || "",
+                        policyAnniv: cols[5 + offset] || "",
+                        medical: cols[6 + offset] || "",
+                        classRating: cols[7 + offset] || "C (normal case size)",
+                        customDateName: cols[8 + offset] || "",
+                        customDateValue: cols[9 + offset] || "",
+                        classA: (cols[10 + offset] || "").toUpperCase() === 'Y',
+                        classE: (cols[11 + offset] || "").toUpperCase() === 'Y',
+                        classF: (cols[12 + offset] || "").toUpperCase() === 'Y',
                     };
 
-                    if(existing) {
-                        Object.assign(existing, clientData); // 仅覆盖 CSV 中的基础字段，保留 note/alerts
-                        updateCount++;
+                    let existingIndex = -1;
+                    if (rowId) existingIndex = clients.findIndex(c => c.id === rowId);
+                    
+                    if (existingIndex !== -1) {
+                        clients[existingIndex] = { ...clients[existingIndex], ...incomingData };
+                        if (!clients[existingIndex].notes) clients[existingIndex].notes = [];
+                        updatedCount++;
                     } else {
-                        // 新增默认字段
-                        clientData.isDeleted = false; clientData.classA = false; clientData.classE = false; 
-                        clientData.classF = false; clientData.classD = false; clientData.clearedAlerts = [];
-                        clientData.lastNote = ""; clientData.lastNoteDate = ""; clientData.notes = [];
-                        clients.push(clientData);
-                        newCount++;
+                        incomingData.id = rowId || Date.now() + i;
+                        incomingData.isDeleted = false;
+                        incomingData.classD = false;
+                        incomingData.clearedAlerts = [];
+                        incomingData.lastNote = "";
+                        incomingData.lastNoteDate = "";
+                        incomingData.notes = [];
+                        clients.push(incomingData);
+                        addedCount++;
                     }
                 }
-
+                
+                // 每次上传并解析完成后，强制调用云端同步功能
                 saveData().then(() => {
-                    alert(`✅ CSV导入成功！\n新增: ${newCount} 位客户\n更新: ${updateCount} 位客户`);
-                    refreshCurrentView();
+                    event.target.value = ''; 
+                    alert(`数据处理完毕！同步更新至 Google Drive。\n新增客户: ${addedCount} 条\n更新客户: ${updatedCount} 条`);
+                    document.getElementById('nav-gallery').click();
                 });
             };
-            reader.readAsText(file);
-            event.target.value = ''; // 重置 file input 防止无法重复上传相同文件
         }
 
-        // 导出 JSON 完整系统备份
-        function exportJSON() {
-            let dataStr = JSON.stringify(clients, null, 2);
-            let blob = new Blob([dataStr], { type: "application/json" });
-            let link = document.createElement("a");
-            link.href = URL.createObjectURL(blob);
-            link.download = `KTAG_Full_Backup_${systemDateStr}.json`;
-            link.click();
+        function exportJsonBackup() {
+            const dataStr = JSON.stringify(clients, null, 2);
+            const blob = new Blob([dataStr], { type: "application/json" });
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = `K_TAG_CRM_Backup_${systemDateStr}.json`;
+            a.click();
         }
 
-        // 导入 JSON 恢复系统
-        function importJSON(event) {
-            let file = event.target.files[0];
+        function importJsonBackup(event) {
+            const file = event.target.files[0];
             if (!file) return;
-            let reader = new FileReader();
+            const reader = new FileReader();
             reader.onload = function(e) {
                 try {
-                    let parsed = JSON.parse(e.target.result);
-                    if(Array.isArray(parsed)) {
-                        if(confirm("⚠️ 危险操作：恢复备份将彻底覆盖当前系统的所有数据！确定要继续吗？")) {
-                            clients = parsed;
-                            saveData().then(() => {
-                                alert("✅ 数据已 100% 成功恢复！");
-                                refreshCurrentView();
-                            });
-                        }
+                    const importedData = JSON.parse(e.target.result);
+                    if (Array.isArray(importedData)) {
+                        clients = importedData;
+                        clients.forEach(c => {
+                            if (!c.notes) {
+                                c.notes = [];
+                                if (c.lastNote) c.notes.push({ date: c.lastNoteDate, content: c.lastNote });
+                            }
+                        });
+                        // 覆盖后同样推送到云端
+                        saveData().then(() => {
+                            alert("恢复成功！系统数据已完整覆盖还原并同步至 Google Drive。");
+                            document.getElementById('nav-gallery').click();
+                        });
                     } else {
-                        alert("❌ 备份文件格式错误，必须为数组格式！");
+                        alert("解析失败：备份文件格式不符合系统标准。");
                     }
-                } catch(err) {
-                    alert("❌ 无法解析 JSON 文件，文件可能已损坏！");
+                } catch (err) {
+                    alert("读取失败：请确保上传的是系统导出的原生 .json 备份文件。");
                 }
+                document.getElementById('jsonFileInput').value = '';
             };
             reader.readAsText(file);
-            event.target.value = ''; 
         }
+
+        function renderDataManagement() {
+            title.innerText = "💾 数据导入与云端备份 (Data Management)";
+            container.innerHTML = `
+                <div class="form-container" style="max-width: 100%;">
+                    
+                    <h3 style="margin-bottom:10px;">☁️ 云端同步状态 (Google Drive)</h3>
+                    <p style="color: #666; font-size: 13px; margin-bottom: 20px;">只要已配置 API_URL，每次修改或上传资料后，系统会自动把数据推送到 Google Sheets 存档。通过云端，更换设备打开链接也能看到最新数据。</p>
+                    <button class="btn-submit" style="margin-top:0; margin-bottom:30px; background: #3b82f6;" onclick="initData()">🔄 强制从云端拉取最新数据</button>
+                    
+                    <hr style="margin: 30px 0; border: 0; border-top: 1px solid var(--border-color);">
+
+                    <h3 style="margin-bottom:10px;">📥 批量导入客户 (Excel / CSV)</h3>
+                    <p style="color: #dc2626; font-weight: bold; font-size: 14px; margin-bottom: 5px;">⚠️ 关键提示：</p>
+                    <p style="color: #666; font-size: 14px; margin-bottom: 20px;">
+                        必须保存为 CSV (Comma delimited) / CSV UTF-8 格式。<br>
+                        <b style="color: #dc2626;">Excel 数据内容建议使用英文避免乱码。</b>
+                    </p>
+                    <div class="data-btn-group" style="margin-bottom: 30px;">
+                        <button class="data-panel-btn btn-export" onclick="exportToCSV()">📄 导出高质量 Excel 模板 (带下拉菜单)</button>
+                        <input type="file" id="csvFileInput" accept=".csv" style="display: none;" onchange="importCsv(event)">
+                        <button class="data-panel-btn btn-import" onclick="document.getElementById('csvFileInput').click()">⬆️ 上传并更新 CSV</button>
+                    </div>
+
+                    <hr style="margin: 30px 0; border: 0; border-top: 1px solid var(--border-color);">
+
+                    <h3 style="margin-bottom:10px;">📤 本地离线备份 (Backup & Restore)</h3>
+                    <p style="color: #666; font-size: 14px; margin-bottom: 20px;">除了云端，您还可以定期导出本地离线文件，更换设备时上传即可 100% 恢复。</p>
+                    <div class="data-btn-group">
+                        <button class="data-panel-btn btn-export" style="background:#d1fae5; color:#065f46; border-color:#34d399;" onclick="exportJsonBackup()">💾 导出完整离线备份 (JSON)</button>
+                        <input type="file" id="jsonFileInput" accept=".json" style="display: none;" onchange="importJsonBackup(event)">
+                        <button class="data-panel-btn btn-import" style="background:#1f2937;" onclick="document.getElementById('jsonFileInput').click()">🔄 恢复完整离线备份</button>
+                    </div>
+                </div>
+            `;
+        }
+
+        function markAsMet(id) {
+            let client = clients.find(c => c.id === id);
+            let note = prompt(`您已完成对 ${client.name} 的面谈！\n\n请简述本次互动的重点：`, "");
+            if (note !== null) {
+                if (!client.clearedAlerts) client.clearedAlerts = [];
+                if (client._activeAlerts) client.clearedAlerts.push(...client._activeAlerts);
+                if (note.trim() !== "") {
+                    if (!client.notes) client.notes = [];
+                    client.notes.push({ date: systemDateStr, content: note });
+                    client.lastNote = note; client.lastNoteDate = systemDateStr;
+                }
+                saveData().then(() => refreshCurrentView());
+            }
+        }
+
+        function addNote(id) {
+            let client = clients.find(c => c.id === id);
+            let note = prompt(`新增 ${client.name} 的互动记录：`);
+            if (note !== null && note.trim() !== "") {
+                if (!client.notes) client.notes = [];
+                client.notes.push({ date: systemDateStr, content: note });
+                client.lastNote = note; client.lastNoteDate = systemDateStr;
+                saveData().then(() => refreshCurrentView());
+            }
+        }
+
+        function deleteClient(id) {
+            if (currentView === 'dried') {
+                if (confirm("彻底删除该客户资料？无法撤销。")) {
+                    clients = clients.filter(c => c.id !== id);
+                    saveData().then(() => refreshCurrentView());
+                }
+            } else {
+                if (confirm("将该客户移至「🍂 Dried」名单？")) {
+                    clients.find(c => c.id === id).isDeleted = true;
+                    saveData().then(() => refreshCurrentView());
+                }
+            }
+        }
+
+        function recoverClient(id) { alert("即将重新激活该客户！请确认标签并保存。"); editClient(id, true); }
+
+        function refreshCurrentView() {
+            if(currentView === 'gallery') renderGallery();
+            if(currentView === 'd2') renderD2();
+            if(currentView === 'classA') renderClassA();
+            if(currentView === 'classB') renderClassB();
+            if(currentView === 'classC') renderClassC();
+            if(currentView === 'classE') renderClassE();
+            if(currentView === 'classF') renderClassF();
+            if(currentView === 'tree') renderTree();
+            if(currentView === 'dried') renderDried();
+            if(currentView === 'data') renderDataManagement();
+        }
+
+        function editClient(id, isRecovering = false) {
+            document.querySelectorAll('.nav-item').forEach(el => el.classList.remove('active'));
+            renderForm(id, isRecovering);
+        }
+
+        function renderForm(clientId = null, isRecovering = false) {
+            let client = clientId ? clients.find(c => c.id === clientId) : {};
+            let isEdit = !!clientId;
+            title.innerText = isRecovering ? `⚠️ 恢复: ${client.name}` : (isEdit ? `编辑: ${client.name}` : "新增客户资料");
+            
+            container.innerHTML = `
+                <div class="form-container" ${isRecovering ? 'style="border: 2px solid var(--accent-color);"' : ''}>
+                    <form id="clientForm" onsubmit="saveClient(event, ${clientId}, ${isRecovering})">
+                        <div class="form-grid">
+                            <div class="form-group"><label>客户姓名 (Name)</label><input type="text" id="f_name" value="${client.name || ''}" required></div>
+                            <div class="form-group"><label>职业 (Occupation)</label><input type="text" id="f_job" value="${client.occupation || ''}"></div>
+                            <div class="form-group full-width"><label>居住地 (Location)</label><input type="text" id="f_loc" value="${client.location || ''}"></div>
+                            <div class="form-group">
+                                <label>树种 (Tree Category)</label>
+                                <select id="f_tree">
+                                    <option value="Seed" ${client.treeCategory === 'Seed' ? 'selected' : ''}>Seed</option>
+                                    <option value="Small Tree" ${client.treeCategory === 'Small Tree' ? 'selected' : ''}>Small Tree</option>
+                                    <option value="Growing Tree" ${client.treeCategory === 'Growing Tree' ? 'selected' : ''}>Growing Tree</option>
+                                    <option value="Fruit Tree" ${client.treeCategory === 'Fruit Tree' ? 'selected' : ''}>Fruit Tree</option>
+                                </select>
+                            </div>
+                            <div class="form-group">
+                                <label>评级 (Rating)</label>
+                                <select id="f_rating">
+                                    <option value="B+ (9X of normal case size)" ${client.classRating === 'B+ (9X of normal case size)' ? 'selected' : ''}>B+ (9X size)</option>
+                                    <option value="B (6X of normal case size)" ${client.classRating === 'B (6X of normal case size)' ? 'selected' : ''}>B (6X size)</option>
+                                    <option value="B- (3X of normal case size)" ${client.classRating === 'B- (3X of normal case size)' ? 'selected' : ''}>B- (3X size)</option>
+                                    <option value="C+ (>normal case size)" ${client.classRating === 'C+ (>normal case size)' ? 'selected' : ''}>C+ (>normal size)</option>
+                                    <option value="C (normal case size)" ${client.classRating === 'C (normal case size)' ? 'selected' : ''}>C (normal size)</option>
+                                    <option value="C- (<normal case size)" ${client.classRating === 'C- (<normal case size)' ? 'selected' : ''}>C- (<normal size)</option>
+                                </select>
+                            </div>
+                            <div class="form-group"><label>出生日期 (DOB)</label><input type="date" id="f_dob" value="${client.dob || ''}"></div>
+                            <div class="form-group"><label>保单周年 (Policy)</label><input type="date" id="f_anniv" value="${client.policyAnniv || ''}"></div>
+                            <div class="form-group"><label>体检日 (Medical)</label><input type="date" id="f_med" value="${client.medical || ''}"></div>
+                            
+                            <div class="custom-date-row">
+                                <div class="form-group"><label>自定义日名称</label><input type="text" id="f_customName" value="${client.customDateName || ''}" placeholder="例如: 结婚纪念日"></div>
+                                <div class="form-group"><label>自定义日期</label><input type="date" id="f_customDate" value="${client.customDateValue || ''}"></div>
+                            </div>
+                            <div class="form-group full-width">
+                                <label>特别标签</label>
+                                <div class="checkbox-group">
+                                    <label><input type="checkbox" id="f_classA" ${client.classA ? 'checked' : ''}> Class A (90天内见)</label>
+                                    <label><input type="checkbox" id="f_classE" ${client.classE ? 'checked' : ''}> Class E (COI转介绍)</label>
+                                    <label><input type="checkbox" id="f_classF" ${client.classF ? 'checked' : ''}> Class F (增员目标)</label>
+                                </div>
+                            </div>
+                        </div>
+                        <button type="submit" class="btn-submit">💾 ${isRecovering ? '确认恢复' : (isEdit ? '更新资料并同步至云端' : '保存资料并同步至云端')}</button>
+                    </form>
+                </div>
+            `;
+        }
+
+        function saveClient(e, existingId, isRecovering) {
+            e.preventDefault();
+            const clientData = {
+                name: document.getElementById('f_name').value, occupation: document.getElementById('f_job').value, location: document.getElementById('f_loc').value,
+                treeCategory: document.getElementById('f_tree').value, dob: document.getElementById('f_dob').value, policyAnniv: document.getElementById('f_anniv').value, medical: document.getElementById('f_med').value,
+                classRating: document.getElementById('f_rating').value, customDateName: document.getElementById('f_customName').value, customDateValue: document.getElementById('f_customDate').value,
+                classA: document.getElementById('f_classA').checked, classE: document.getElementById('f_classE').checked, classF: document.getElementById('f_classF').checked
+            };
+            if (existingId) {
+                let index = clients.findIndex(c => c.id === existingId);
+                clients[index] = { ...clients[index], ...clientData };
+                if (isRecovering) clients[index].isDeleted = false;
+            } else {
+                clientData.id = Date.now(); clientData.isDeleted = false; clientData.classD = false; clientData.clearedAlerts = [];
+                clientData.lastNote = ""; clientData.lastNoteDate = ""; clientData.notes = [];
+                clients.push(clientData); 
+            }
+            
+            // 保存资料的同时推送到云端
+            saveData().then(() => {
+                alert("已成功保存并推送至云端 Google Drive！");
+                switchView('gallery', document.getElementById('nav-gallery'));
+            });
+        }
+
+        function switchView(viewName, element) {
+            if (element) {
+                document.querySelectorAll('.nav-item').forEach(el => el.classList.remove('active'));
+                element.classList.add('active');
+            }
+            currentView = viewName;
+            if(viewName === 'gallery') renderGallery();
+            if(viewName === 'add') renderForm(null, false);
+            if(viewName === 'd2') renderD2();
+            if(viewName === 'classA') renderClassA();
+            if(viewName === 'classB') renderClassB();
+            if(viewName === 'classC') renderClassC();
+            if(viewName === 'classE') renderClassE();
+            if(viewName === 'classF') renderClassF();
+            if(viewName === 'tree') renderTree();
+            if(viewName === 'dried') renderDried();
+            if(viewName === 'data') renderDataManagement();
+        }
+
+        // 页面打开时，自动触发从云端 Google Sheets 拉取同步
+        initData();
+    </script>
+</body>
+</html>
