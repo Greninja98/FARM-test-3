@@ -1,0 +1,136 @@
+// ==========================================
+        // 导入 / 导出 功能逻辑 (CSV & JSON)
+        // ==========================================
+
+        // 导出 CSV 模板（带现有数据以便更新）
+        function exportCSVTemplate() {
+            let headers = ["ID (勿改)", "姓名 (Name)", "职业 (Occupation)", "居住地 (Location)", "树种 (Seed/Small Tree/Growing Tree/Fruit Tree)", "评级结构", "出生日期 (YYYY-MM-DD)", "保单日 (YYYY-MM-DD)", "体检日 (YYYY-MM-DD)", "自定义日名称", "自定义日期 (YYYY-MM-DD)"];
+            
+            // 加上 BOM 头确保 Excel 打开 UTF-8 不会乱码
+            let csvContent = "\uFEFF" + headers.join(",") + "\n"; 
+            
+            clients.forEach(c => {
+                if(!c.isDeleted) {
+                    let row = [
+                        c.id, c.name, c.occupation, c.location, c.treeCategory, c.classRating,
+                        c.dob, c.policyAnniv, c.medical, c.customDateName, c.customDateValue
+                    ].map(v => {
+                        let str = (v === null || v === undefined) ? '' : String(v);
+                        // 替换双引号并用双引号包裹，防止逗号截断
+                        return `"${str.replace(/"/g, '""')}"`; 
+                    }).join(",");
+                    csvContent += row + "\n";
+                }
+            });
+
+            let blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+            let link = document.createElement("a");
+            link.href = URL.createObjectURL(blob);
+            link.download = `KTAG_Clients_${systemDateStr}.csv`;
+            link.click();
+        }
+
+        // 解析 CSV 行（处理逗号和引号的特殊情况）
+        function parseCSVRow(str) {
+            let arr = [], quote = false, val = '';
+            for (let i = 0; i < str.length; i++) {
+                let cc = str[i], nc = str[i+1];
+                if (cc === '"' && quote && nc === '"') { val += '"'; i++; continue; }
+                if (cc === '"') { quote = !quote; continue; }
+                if (cc === ',' && !quote) { arr.push(val); val = ''; continue; }
+                val += cc;
+            }
+            arr.push(val);
+            return arr.map(s => s.trim());
+        }
+
+        // 导入 CSV 并更新/新增客户
+        function importCSV(event) {
+            let file = event.target.files[0];
+            if (!file) return;
+            let reader = new FileReader();
+            reader.onload = function(e) {
+                let text = e.target.result;
+                let rows = text.split(/\r?\n/);
+                let newCount = 0, updateCount = 0;
+                
+                for(let i = 1; i < rows.length; i++) { // 跳过表头
+                    if(!rows[i].trim()) continue;
+                    let cols = parseCSVRow(rows[i]);
+                    if(cols.length < 2 || !cols[1]) continue; // 如果没有名字，跳过
+                    
+                    let id = cols[0] ? parseInt(cols[0]) : Date.now() + i;
+                    let existing = clients.find(c => c.id === id);
+                    
+                    let clientData = {
+                        id: id,
+                        name: cols[1] || '',
+                        occupation: cols[2] || '',
+                        location: cols[3] || '',
+                        treeCategory: cols[4] || 'Seed',
+                        classRating: cols[5] || 'C (normal case size)',
+                        dob: cols[6] || '',
+                        policyAnniv: cols[7] || '',
+                        medical: cols[8] || '',
+                        customDateName: cols[9] || '',
+                        customDateValue: cols[10] || ''
+                    };
+
+                    if(existing) {
+                        Object.assign(existing, clientData); // 仅覆盖 CSV 中的基础字段，保留 note/alerts
+                        updateCount++;
+                    } else {
+                        // 新增默认字段
+                        clientData.isDeleted = false; clientData.classA = false; clientData.classE = false; 
+                        clientData.classF = false; clientData.classD = false; clientData.clearedAlerts = [];
+                        clientData.lastNote = ""; clientData.lastNoteDate = ""; clientData.notes = [];
+                        clients.push(clientData);
+                        newCount++;
+                    }
+                }
+
+                saveData().then(() => {
+                    alert(`✅ CSV导入成功！\n新增: ${newCount} 位客户\n更新: ${updateCount} 位客户`);
+                    refreshCurrentView();
+                });
+            };
+            reader.readAsText(file);
+            event.target.value = ''; // 重置 file input 防止无法重复上传相同文件
+        }
+
+        // 导出 JSON 完整系统备份
+        function exportJSON() {
+            let dataStr = JSON.stringify(clients, null, 2);
+            let blob = new Blob([dataStr], { type: "application/json" });
+            let link = document.createElement("a");
+            link.href = URL.createObjectURL(blob);
+            link.download = `KTAG_Full_Backup_${systemDateStr}.json`;
+            link.click();
+        }
+
+        // 导入 JSON 恢复系统
+        function importJSON(event) {
+            let file = event.target.files[0];
+            if (!file) return;
+            let reader = new FileReader();
+            reader.onload = function(e) {
+                try {
+                    let parsed = JSON.parse(e.target.result);
+                    if(Array.isArray(parsed)) {
+                        if(confirm("⚠️ 危险操作：恢复备份将彻底覆盖当前系统的所有数据！确定要继续吗？")) {
+                            clients = parsed;
+                            saveData().then(() => {
+                                alert("✅ 数据已 100% 成功恢复！");
+                                refreshCurrentView();
+                            });
+                        }
+                    } else {
+                        alert("❌ 备份文件格式错误，必须为数组格式！");
+                    }
+                } catch(err) {
+                    alert("❌ 无法解析 JSON 文件，文件可能已损坏！");
+                }
+            };
+            reader.readAsText(file);
+            event.target.value = ''; 
+        }
